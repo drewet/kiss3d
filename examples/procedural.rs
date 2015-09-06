@@ -1,11 +1,11 @@
 extern crate time;
+extern crate rand;
 extern crate ncollide_procedural;
 extern crate ncollide_transformation;
 extern crate kiss3d;
-extern crate "nalgebra" as na;
+extern crate nalgebra as na;
 
-use std::f32;
-use std::rand;
+use std::path::Path;
 use na::{Pnt2, Pnt3, Vec2, Vec3, Translation};
 use ncollide_procedural::{Polyline, TriMesh};
 use ncollide_procedural::path::{PolylinePath, PolylinePattern, StrokePattern, ArrowheadCap};
@@ -111,11 +111,11 @@ fn main() {
      * Convex hull of 100,000 random 3d points.
      */
     let mut points = Vec::new();
-    for _ in range(0u, 100000) {
+    for _ in 0usize .. 100000 {
         points.push(rand::random::<Pnt3<f32>>() * 2.0f32);
     }
 
-    let chull  = ncollide_transformation::convex_hull3(points.as_slice());
+    let chull  = ncollide_transformation::convex_hull3(&points[..]);
     let mut mhull = window.add_trimesh(chull, na::one());
     let mut mpts  = window.add_trimesh(TriMesh::new(points, None, None, None), na::one());
     mhull.append_translation(&Vec3::new(0.0, 2.0, -1.0));
@@ -133,11 +133,11 @@ fn main() {
      */
     let mut points = Vec::new();
     let origin     = Pnt2::new(3.0f32, 2.0);
-    for _ in range(0u, 100000) {
+    for _ in 0usize .. 100000 {
         points.push(origin + rand::random::<Vec2<f32>>() * 2.0f32);
     }
 
-    let points   = points.as_slice();
+    let points   = &points[..];
     let polyline = ncollide_transformation::convex_hull2(points);
 
     /*
@@ -152,8 +152,8 @@ fn main() {
     }
 }
 
-fn draw_polyline(window: &mut Window, polyline: &Polyline<f32, Pnt2<f32>, Vec2<f32>>, points: &[Pnt2<f32>]) {
-    for pt in polyline.coords.as_slice().windows(2) {
+fn draw_polyline(window: &mut Window, polyline: &Polyline<Pnt2<f32>>, points: &[Pnt2<f32>]) {
+    for pt in polyline.coords[..].windows(2) {
         window.draw_line(&Pnt3::new(pt[0].x, pt[0].y, 0.0), &Pnt3::new(pt[1].x, pt[1].y, 0.0), &Pnt3::new(0.0, 1.0, 0.0));
     }
 
@@ -166,7 +166,7 @@ fn draw_polyline(window: &mut Window, polyline: &Polyline<f32, Pnt2<f32>, Vec2<f
             window.draw_point(&Pnt3::new(pt.x, pt.y, 0.0), &Pnt3::new(0.0, 0.0, 1.0));
     }
 
-    for pt in polyline.coords.as_slice().iter() {
+    for pt in polyline.coords[..].iter() {
         window.draw_point(&Pnt3::new(pt.x, pt.y, 0.0), &Pnt3::new(1.0, 0.0, 0.0));
     }
 

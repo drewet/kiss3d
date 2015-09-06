@@ -2,12 +2,14 @@
 // available under the BSD-3 licence.
 // It has been modified to work with gl-rs, nalgebra, and rust-freetype
 
+use std::mem;
+use std::slice;
 use std::ffi::CString;
 use std::rc::Rc;
-use std::num::UnsignedInt;
 use std::cmp;
 use std::ptr;
-use libc::{c_uint, c_void};
+use std::path::Path;
+use libc::c_uint;
 use gl;
 use gl::types::*;
 use freetype::ffi;
@@ -46,7 +48,7 @@ impl Font {
             face:             ptr::null_mut(),
             texture_atlas:    0,
             atlas_dimensions: na::zero(),
-            glyphs:           range(0, 128).map(|_:isize| None).collect(),
+            glyphs:           (0 .. 128).map(|_:isize| None).collect(),
             height:           0
         };
 
@@ -55,14 +57,14 @@ impl Font {
 
             match path {
                 Some(path) => {
-                    let path = path.as_str().expect("Invalid path.");
-                    let c_str = CString::from_slice(path.as_bytes());
+                    let path = path.to_str().expect("Invalid path.");
+                    let c_str = CString::new(path.as_bytes()).unwrap();
                     if ffi::FT_New_Face(font.library, c_str.as_ptr(), 0, &mut font.face) != 0 {
                         panic!("Failed to create TTF face.");
                     }
                 },
                 None => {
-                    if ffi::FT_New_Memory_Face(font.library, &memory[0], memory.len() as i64, 0, &mut font.face) != 0 {
+                    if ffi::FT_New_Memory_Face(font.library, &memory[0], memory.len() as ffi::FT_Long, 0, &mut font.face) != 0 {
                         panic!("Failed to create TTF face.");
                     }
                 }
@@ -76,8 +78,8 @@ impl Font {
             let mut row_width  = 0;
             let mut row_height = 0;
 
-            for curr in range(0u, 128) {
-                if ffi::FT_Load_Char(font.face, curr as u64, ffi::FT_LOAD_RENDER) != 0 {
+            for curr in (0usize .. 128) {
+                if ffi::FT_Load_Char(font.face, curr as ffi::FT_ULong, ffi::FT_LOAD_RENDER) != 0 {
                     continue;
                 }
 
@@ -91,7 +93,8 @@ impl Font {
                 let advance    = Vec2::new(((*ft_glyph).advance.x >> 6) as f32, ((*ft_glyph).advance.y >> 6) as f32);
                 let dimensions = Vec2::new((*ft_glyph).bitmap.width as f32, (*ft_glyph).bitmap.rows as f32);
                 let offset     = Vec2::new((*ft_glyph).bitmap_left as f32, (*ft_glyph).bitmap_top as f32);
-                let buffer     = Vec::from_raw_buf(&*(*ft_glyph).bitmap.buffer, (dimensions.x * dimensions.y) as usize);
+                let buf_len    = (dimensions.x * dimensions.y) as usize;
+                let buffer     = slice::from_raw_parts(&*(*ft_glyph).bitmap.buffer, buf_len).to_vec();
                 let glyph      = Glyph::new(na::zero(), advance, dimensions, offset, buffer);
                     
 
@@ -102,8 +105,8 @@ impl Font {
                 font.glyphs[curr] = Some(glyph);
             }
 
-            font.atlas_dimensions.x = UnsignedInt::next_power_of_two(cmp::max(font.atlas_dimensions.x, row_width as usize));
-            font.atlas_dimensions.y = UnsignedInt::next_power_of_two(font.atlas_dimensions.y + row_height);
+            font.atlas_dimensions.x = (cmp::max(font.atlas_dimensions.x, row_width as usize)).next_power_of_two();
+            font.atlas_dimensions.y = (font.atlas_dimensions.y + row_height).next_power_of_two();
 
             /* We're using 1 byte alignment buffering. */
             verify!(gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1));
@@ -125,7 +128,7 @@ impl Font {
             /* Copy all glyphs into the texture atlas. */
             let mut offset: Vec2<i32> = na::zero();
             row_height = 0;
-            for curr in range(0u, 128) {
+            for curr in (0usize .. 128) {
                 let glyph = match *&mut font.glyphs[curr] {
                     Some(ref mut g) => g,
                     None            => continue
@@ -141,7 +144,7 @@ impl Font {
                     verify!(gl::TexSubImage2D(
                                 gl::TEXTURE_2D, 0, offset.x, offset.y,
                                 glyph.dimensions.x as i32, glyph.dimensions.y as i32,
-                                gl::RED, gl::UNSIGNED_BYTE, &glyph.buffer[0] as *const u8 as *const c_void));
+                                gl::RED, gl::UNSIGNED_BYTE, mem::transmute(&glyph.buffer[0])));
                 }
 
                 /* Calculate the position in the texture. */
@@ -175,8 +178,8 @@ impl Font {
 
     /// The glyphs of the this font.
     #[inline]
-    pub fn glyphs<'a>(&'a self) -> &'a [Option<Glyph>] {
-        self.glyphs.as_slice()
+    pub fn glyphs(&self) -> &[Option<Glyph>] {
+        &self.glyphs[..]
     }
 
     /// The height of this font.

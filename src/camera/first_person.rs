@@ -1,5 +1,5 @@
 use std::f32;
-use std::num::Float;
+use num::Float;
 use glfw;
 use glfw::{Key, Action, WindowEvent};
 use na::{Translation, Pnt3, Vec2, Vec3, Mat4, Iso3, PerspMat3};
@@ -12,7 +12,7 @@ use camera::Camera;
 ///   * Right button press + drag - translates the camera position on the plane orthogonal to the
 ///   view direction
 ///   * Scroll in/out - zoom in/out
-#[derive(Show, Clone)]
+#[derive(Debug, Clone)]
 pub struct FirstPerson {
     eye:             Pnt3<f32>,
     yaw:             f32,
@@ -31,7 +31,7 @@ pub struct FirstPerson {
 impl FirstPerson {
     /// Creates a first person camera with default sensitivity values.
     pub fn new(eye: Pnt3<f32>, at: Pnt3<f32>) -> FirstPerson {
-        FirstPerson::new_with_frustrum(45.0f32.to_radians(), 0.1, 1024.0, eye, at)
+        FirstPerson::new_with_frustrum(f32::consts::PI / 4.0, 0.1, 1024.0, eye, at)
     }
 
     /// Creates a new first person camera with default sensitivity values.
@@ -270,7 +270,7 @@ impl Camera for FirstPerson {
         let dir   = self.move_dir(up, down, right, left);
 
         let move_amount  = dir * self.move_step;
-        self.append_translation(&move_amount);
+        self.append_translation_mut(&move_amount);
     }
 }
 
@@ -286,33 +286,33 @@ impl Translation<Vec3<f32>> for FirstPerson {
     }
 
     #[inline]
-    fn append_translation(&mut self, t: &Vec3<f32>) {
+    fn append_translation_mut(&mut self, t: &Vec3<f32>) {
         let new_t = self.eye + *t;
 
         self.set_translation(new_t.to_vec());
     }
 
     #[inline]
-    fn append_translation_cpy(&self, t: &Vec3<f32>) -> FirstPerson {
+    fn append_translation(&self, t: &Vec3<f32>) -> FirstPerson {
         let mut res = self.clone();
 
-        res.append_translation(t);
+        res.append_translation_mut(t);
 
         res
     }
 
     #[inline]
-    fn prepend_translation(&mut self, t: &Vec3<f32>) {
+    fn prepend_translation_mut(&mut self, t: &Vec3<f32>) {
         let new_t = self.eye - *t;
 
         self.set_translation(new_t.to_vec()); // FIXME: is this correct?
     }
 
     #[inline]
-    fn prepend_translation_cpy(&self, t: &Vec3<f32>) -> FirstPerson {
+    fn prepend_translation(&self, t: &Vec3<f32>) -> FirstPerson {
         let mut res = self.clone();
 
-        res.prepend_translation(t);
+        res.prepend_translation_mut(t);
 
         res
     }

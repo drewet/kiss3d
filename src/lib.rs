@@ -86,21 +86,19 @@ I’d love to see people improving this library for their own needs. However, ke
 #![deny(unused_qualifications)]
 #![warn(missing_docs)] // FIXME: should be denied.
 #![deny(unused_results)]
-#![deny(unused_typecasts)]
 #![allow(unused_unsafe)] // FIXME: should be denied
 #![allow(missing_copy_implementations)]
-#![feature(unsafe_destructor)]
-#![feature(int_uint)] // FIXME: remove this
 #![doc(html_root_url = "http://kiss3d.org/doc")]
 
 extern crate libc;
 extern crate time;
-extern crate glfw;
 extern crate gl;
-extern crate "nalgebra" as na;
+extern crate num;
+extern crate nalgebra as na;
 extern crate ncollide_procedural;
-extern crate stb_image;
+extern crate image;
 extern crate freetype;
+extern crate glfw;
 
 mod error;
 pub mod window;

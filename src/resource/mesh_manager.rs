@@ -1,9 +1,10 @@
 //! A resource manager to load meshes.
 
-use std::io::IoResult;
+use std::io::Result as IoResult;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::path::Path;
 use ncollide_procedural::TriMesh3;
 use ncollide_procedural as procedural;
 use resource::Mesh;

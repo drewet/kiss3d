@@ -3,23 +3,15 @@ name    = "kiss3d-examples"
 version = "0.1.0"
 authors = [ "Sébastien Crozet <developer@crozet.re>" ]
 
-[dependencies.time]
-git = "https://github.com/rust-lang/time"
-
-[dependencies.gl]
-git = "https://github.com/bjz/gl-rs"
-
-[dependencies.glfw]
-git = "https://github.com/bjz/glfw-rs"
-
-[dependencies.nalgebra]
-git = "https://github.com/sebcrozet/nalgebra"
-
-[dependencies.ncollide_procedural]
-git = "https://github.com/sebcrozet/ncollide"
-
-[dependencies.ncollide_transformation]
-git = "https://github.com/sebcrozet/ncollide"
+[dependencies]
+rand = "*"
+nalgebra = "*"
+gl = "*"
+time = "*"
+num = "*"
+glfw = "*"
+ncollide_procedural = "*"
+ncollide_transformation = "*"
 
 [dependencies.kiss3d]
 path = ".."

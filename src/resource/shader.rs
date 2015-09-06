@@ -1,11 +1,12 @@
+use std::marker::PhantomData;
 use std::ffi::CString;
 use std::mem;
 use std::ptr;
 use std::str;
 use std::iter::repeat;
-use std::io::fs::File;
-use std::io::fs::PathExtensions;
-use std::io::Reader;
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
 use gl;
 use gl::types::*;
 use camera::Camera;
@@ -24,26 +25,18 @@ pub struct Shader {
 impl Shader {
     /// Creates a new shader program from two files containing the vertex and fragment shader.
     pub fn new(vshader_path: &Path, fshader_path: &Path) -> Option<Shader> {
-        if !vshader_path.exists() || !fshader_path.exists() {
-            None
+        let mut vshader = String::new();
+        let mut fshader = String::new();
+
+        if File::open(vshader_path).map(|mut v| v.read_to_string(&mut vshader)).is_err() {
+            return None;
         }
-        else {
-            let vshader = File::open(vshader_path).map(|mut v| v.read_to_string());
-            let fshader = File::open(fshader_path).map(|mut f| f.read_to_string());
 
-            if vshader.is_err() || fshader.is_err() {
-                return None;
-            }
-
-            let vshader = vshader.unwrap();
-            let fshader = fshader.unwrap();
-
-            if vshader.is_err() || fshader.is_err() {
-                return None;
-            }
-
-            Some(Shader::new_from_str(vshader.unwrap().as_slice(), fshader.unwrap().as_slice()))
+        if File::open(fshader_path).map(|mut f| f.read_to_string(&mut fshader)).is_err() {
+            return None;
         }
+
+        Some(Shader::new_from_str(&vshader[..], &fshader[..]))
     }
 
     /// Creates a new shader program from strings of the vertex and fragment shader.
@@ -59,11 +52,11 @@ impl Shader {
 
     /// Gets a uniform variable from the shader program.
     pub fn get_uniform<T: GLPrimitive>(&self, name: &str) -> Option<ShaderUniform<T>> {
-        let c_str = CString::from_slice(name.as_bytes());
+        let c_str = CString::new(name.as_bytes()).unwrap();
         let location = unsafe { gl::GetUniformLocation(self.program, c_str.as_ptr()) };
 
         if unsafe { gl::GetError() } == 0 && location != -1 {
-            Some(ShaderUniform { id: location as GLuint })
+            Some(ShaderUniform { id: location as GLuint, data_type: PhantomData })
         }
         else {
             None
@@ -72,11 +65,11 @@ impl Shader {
 
     /// Gets an attribute from the shader program.
     pub fn get_attrib<T: GLPrimitive>(&self, name: &str) -> Option<ShaderAttribute<T>> {
-        let c_str = CString::from_slice(name.as_bytes());
+        let c_str = CString::new(name.as_bytes()).unwrap();
         let location = unsafe { gl::GetAttribLocation(self.program, c_str.as_ptr()) };
 
         if unsafe { gl::GetError() } == 0 && location != -1 {
-            Some(ShaderAttribute { id: location as GLuint })
+            Some(ShaderAttribute { id: location as GLuint, data_type: PhantomData })
         }
         else {
             None
@@ -99,7 +92,8 @@ impl Drop for Shader {
 
 /// Structure encapsulating an uniform variable.
 pub struct ShaderUniform<T> {
-    id: GLuint
+    id:        GLuint,
+    data_type: PhantomData<T>
 }
 
 impl<T: GLPrimitive> ShaderUniform<T> {
@@ -111,7 +105,8 @@ impl<T: GLPrimitive> ShaderUniform<T> {
 
 /// Structure encapsulating an attribute.
 pub struct ShaderAttribute<T> {
-    id: GLuint
+    id:        GLuint,
+    data_type: PhantomData<T>
 }
 
 impl<T: GLPrimitive> ShaderAttribute<T> {
@@ -162,8 +157,8 @@ impl<T: GLPrimitive> ShaderAttribute<T> {
 fn load_shader_program(vertex_shader: &str, fragment_shader: &str) -> (GLuint, GLuint, GLuint) {
     // Create and compile the vertex shader
     let vshader = verify!(gl::CreateShader(gl::VERTEX_SHADER));
-    let vertex_shader = CString::from_slice(vertex_shader.as_bytes());
-    let fragment_shader = CString::from_slice(fragment_shader.as_bytes());
+    let vertex_shader = CString::new(vertex_shader.as_bytes()).unwrap();
+    let fragment_shader = CString::new(fragment_shader.as_bytes()).unwrap();
 
     unsafe {
         verify!(gl::ShaderSource(vshader, 1, &vertex_shader.as_ptr(), ptr::null()));
@@ -209,11 +204,11 @@ fn check_shader_error(shader: GLuint) {
                 let mut chars_written = 0;
                 let info_log: String = repeat(' ').take(info_log_len as usize).collect();
 
-                let mut c_str = CString::from_slice(info_log.as_bytes());
+                let c_str = CString::new(info_log.as_bytes()).unwrap();
                 gl::GetShaderInfoLog(shader, info_log_len, &mut chars_written, c_str.as_ptr() as *mut i8);
 
                 let bytes = c_str.as_bytes();
-                let bytes = bytes.slice_to(bytes.len() - 1);
+                let bytes = &bytes[.. bytes.len() - 1];
                 panic!("Shader compilation failed: {}", str::from_utf8(bytes).unwrap());
             }
         }

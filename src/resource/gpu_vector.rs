@@ -121,7 +121,7 @@ impl<T: GLPrimitive> GPUVector<T> {
 
             self.handle = self.data.as_ref().map(|d| {
                 *len = d.len();
-                (d.len(), GLHandle::new(upload_buffer(d.as_slice(), buf_type, alloc_type)))
+                (d.len(), GLHandle::new(upload_buffer(&d[..], buf_type, alloc_type)))
             });
         }
         else if self.trash() {
@@ -133,7 +133,7 @@ impl<T: GLPrimitive> GPUVector<T> {
                     Some((ref mut len, ref handle)) => {
                         let handle = handle.handle();
 
-                        *len = update_buffer(d.as_slice(), *len, handle, self.buf_type, self.alloc_type)
+                        *len = update_buffer(&d[..], *len, handle, self.buf_type, self.alloc_type)
                     }
                 }
             }
@@ -173,7 +173,7 @@ impl<T: GLPrimitive> GPUVector<T> {
             let mut data   = Vec::with_capacity(self.len);
 
             unsafe { data.set_len(self.len) };
-            download_buffer(handle, self.buf_type, data.as_mut_slice());
+            download_buffer(handle, self.buf_type, &mut data[..]);
             self.data = Some(data);
         }
     }
@@ -212,7 +212,7 @@ impl<T: Clone + GLPrimitive> GPUVector<T> {
 }
 
 /// Type of gpu buffer.
-#[derive(Copy)]
+#[derive(Clone, Copy)]
 pub enum BufferType {
     /// An array buffer bindable to a gl::ARRAY_BUFFER.
     Array,
@@ -231,7 +231,7 @@ impl BufferType {
 }
 
 /// Allocation type of gpu buffers.
-#[derive(Copy)]
+#[derive(Clone, Copy)]
 pub enum AllocationType {
     /// STATIC_DRAW allocation type.
     StaticDraw,

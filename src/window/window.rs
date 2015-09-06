@@ -3,15 +3,15 @@
  * FIXME: this file is too big. Some heavy refactoring need to be done here.
  */
 
+use std::mem;
+use std::thread;
 use glfw;
 use glfw::{Context, Key, Action, WindowMode, WindowEvent};
-use std::io::timer::Timer;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::mpsc::Receiver;
-use libc;
+use std::path::Path;
 use std::iter::repeat;
-use std::time::Duration;
 use time;
 use gl;
 use gl::types::*;
@@ -50,7 +50,6 @@ pub struct Window {
     text_renderer:              TextRenderer,
     framebuffer_manager:        FramebufferManager,
     post_process_render_target: RenderTarget,
-    timer:                      Timer,
     curr_time:                  u64,
     camera:                     Rc<RefCell<ArcBall>>
 }
@@ -70,8 +69,14 @@ impl Window {
 
     /// Access the glfw window.
     #[inline]
-    pub fn glfw_window<'r>(&'r self) -> &'r glfw::Window {
+    pub fn glfw_window(&self) -> &glfw::Window {
         &self.window
+    }
+
+    /// Mutably access the glfw window.
+    #[inline]
+    pub fn glfw_window_mut(&mut self) -> &mut glfw::Window {
+        &mut self.window
     }
 
     /// The window width.
@@ -102,6 +107,11 @@ impl Window {
     #[inline]
     pub fn set_framerate_limit(&mut self, fps: Option<u64>) {
         self.max_ms_per_frame = fps.map(|f| { assert!(f != 0); 1000 / f })
+    }
+    
+    /// Set window title
+    pub fn set_title(&mut self, title: &str) {
+        self.window.set_title(title)
     }
 
     /// Closes the window.
@@ -308,7 +318,7 @@ impl Window {
 
         let glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
 
-        let (window, events) = glfw.create_window(width, height, title, WindowMode::Windowed).expect("Unable to open a glfw window.");
+        let (mut window, events) = glfw.create_window(width, height, title, WindowMode::Windowed).expect("Unable to open a glfw window.");
 
         window.make_current();
 
@@ -329,7 +339,6 @@ impl Window {
             text_renderer:         TextRenderer::new(),
             post_process_render_target: FramebufferManager::new_render_target(width as usize, height as usize),
             framebuffer_manager:   FramebufferManager::new(),
-            timer:                 Timer::new().unwrap(),
             curr_time:             time::precise_time_ns(),
             camera:                Rc::new(RefCell::new(ArcBall::new(Pnt3::new(0.0f32, 0.0, -1.0), na::orig())))
         };
@@ -371,12 +380,20 @@ impl Window {
     /// * `out` - the output buffer. It is automatically resized.
     pub fn snap(&self, out: &mut Vec<u8>) {
         let (width, height) = self.window.get_size();
+        self.snap_rect(out, 0, 0, width as usize, height as usize)
+    }
 
+    /// Read a section of pixels from the screen
+    ///
+    /// # Arguments:
+    /// * `out` - the output buffer. It is automatically resized
+    /// * `x, y, width, height` - the rectangle to capture
+    pub fn snap_rect(&self, out: &mut Vec<u8>, x: usize, y: usize, width: usize, height: usize) {
         let size = (width * height * 3) as usize;
 
         if out.len() < size {
             let diff = size - out.len();
-	    out.extend(repeat(0).take(diff));
+            out.extend(repeat(0).take(diff));
         }
         else {
             out.truncate(size)
@@ -385,11 +402,11 @@ impl Window {
         // FIXME: this is _not_ the fastest way of doing this.
         unsafe {
             gl::PixelStorei(gl::PACK_ALIGNMENT, 1);
-            gl::ReadPixels(0, 0,
-                           width, height,
+            gl::ReadPixels(x as i32, y as i32,
+                           width as i32, height as i32,
                            gl::RGB,
                            gl::UNSIGNED_BYTE,
-                           (&mut out[0]) as *mut u8 as *mut libc::c_void);
+                           mem::transmute(&mut out[0]));
         }
     }
 
@@ -474,18 +491,25 @@ impl Window {
         let mut camera = camera;
         self.handle_events(&mut camera);
 
-        let self_cam      = self.camera.clone(); // FIXME: this is ugly.
-        let mut bself_cam = self_cam.borrow_mut();
-        let camera = match camera {
-            None      => &mut *bself_cam as &mut Camera,
-            Some(cam) => cam
-        };
+        match camera {
+            Some(cam) => self.do_render_with(cam, post_processing),
+            None      => {
+                let self_cam      = self.camera.clone(); // FIXME: this is ugly.
+                let mut bself_cam = self_cam.borrow_mut();
+                self.do_render_with(&mut *bself_cam, post_processing)
+            }
+        }
+    }
 
+    fn do_render_with(&mut self,
+                      camera:          &mut Camera,
+                      post_processing: Option<&mut PostProcessingEffect>)
+                      -> bool {
         // XXX: too bad we have to do this at each frame…
         let w = self.width();
         let h = self.height();
-        camera.handle_event(&self.window, &WindowEvent::FramebufferSize(w as i32, h as i32));
 
+        camera.handle_event(&self.window, &WindowEvent::FramebufferSize(w as i32, h as i32));
         camera.update(&self.window);
 
         match self.light_mode {
@@ -502,7 +526,7 @@ impl Window {
             self.framebuffer_manager.select(&FramebufferManager::screen());
         }
 
-        for pass in range(0u, camera.num_passes()) {
+        for pass in 0usize .. camera.num_passes() {
             camera.start_pass(pass, &self.window);
             self.render_scene(camera, pass);
         }
@@ -539,7 +563,7 @@ impl Window {
             Some(ms) => {
                 let elapsed = (time::precise_time_ns() - self.curr_time) / 1000000;
                 if elapsed < ms {
-                    self.timer.sleep(Duration::milliseconds((ms - elapsed) as i64));
+                    thread::sleep_ms((ms - elapsed) as u32);
                 }
             }
         }

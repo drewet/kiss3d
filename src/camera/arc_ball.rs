@@ -1,5 +1,5 @@
 use std::f32;
-use std::num::Float;
+use num::Float;
 use glfw::{Key, Action};
 use glfw;
 use glfw::WindowEvent;
@@ -17,7 +17,7 @@ use camera::Camera;
 /// direction
 /// * Scroll in/out - zoom in/out
 /// * Enter key - set the focus point to the origin
-#[derive(Clone, Show)]
+#[derive(Clone, Debug)]
 pub struct ArcBall {
     /// The focus point.
     at:    Pnt3<f32>,
@@ -44,7 +44,7 @@ pub struct ArcBall {
 impl ArcBall {
     /// Create a new arc-ball camera.
     pub fn new(eye: Pnt3<f32>, at: Pnt3<f32>) -> ArcBall {
-        ArcBall::new_with_frustrum(45.0f32.to_radians(), 0.1, 1024.0, eye, at)
+        ArcBall::new_with_frustrum(f32::consts::PI / 4.0, 0.1, 1024.0, eye, at)
     }
 
     /// Creates a new arc ball camera with default sensitivity values.
@@ -75,6 +75,12 @@ impl ArcBall {
     /// The point the arc-ball is looking at.
     pub fn at(&self) -> Pnt3<f32> {
         self.at
+    }
+
+    /// Get a mutable reference to the point the camera is looking at.
+    pub fn set_at(&mut self, at: Pnt3<f32>) {
+        self.at = at;
+        self.update_projviews();
     }
 
     /// The arc-ball camera `yaw`.
